@@ -43,17 +43,80 @@ def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
            string and return it along with session["outfit_suggestion"] and
            session["fit_card"].
     """
-    # TODO: implement this function
-    return "Agent not yet implemented.", "", ""
+    if not user_query or not user_query.strip():
+        return "Please describe what you are looking for.", "", ""
+
+    if wardrobe_choice == "Empty wardrobe (new user)":
+        wardrobe = get_empty_wardrobe()
+    else:
+        wardrobe = get_example_wardrobe()
+
+    session = run_agent(user_query.strip(), wardrobe)
+    if session["error"]:
+        return session["error"], "", ""
+
+    item = session["selected_item"]
+    lines = [
+        item["title"],
+        f"Price: ${item['price']:.2f}",
+        f"Platform: {item['platform']}",
+        f"Size: {item['size']}",
+        f"Condition: {item['condition']}",
+        f"Category: {item['category']}",
+        f"Colors: {', '.join(item.get('colors') or [])}",
+        f"Style tags: {', '.join(item.get('style_tags') or [])}",
+    ]
+
+    if session["retry_note"]:
+        lines.extend(["", f"Retry: {session['retry_note']}"])
+
+    price = session.get("price_assessment") or {}
+    if price:
+        lines.extend(
+            [
+                "",
+                f"Price check: {price.get('assessment', 'unknown')}",
+                price.get("reasoning", ""),
+                f"Comparables: {', '.join(price.get('comparable_titles') or [])}",
+            ]
+        )
+
+    trend = session.get("trend_info") or {}
+    if trend:
+        lines.extend(
+            [
+                "",
+                f"Trend match: {trend.get('trend_name', 'Unknown')}",
+                f"Trend angle: {trend.get('styling_angle', '')}",
+                f"Trend source: {trend.get('source', '')}",
+            ]
+        )
+
+    profile = session.get("style_profile") or {}
+    if profile.get("preferences") or profile.get("style_tags"):
+        lines.extend(
+            [
+                "",
+                f"Style memory: {'; '.join(profile.get('preferences') or [])}",
+                f"Saved tags: {', '.join(profile.get('style_tags') or [])}",
+            ]
+        )
+
+    lines.extend(["", item.get("description", "")])
+    listing_text = "\n".join(line for line in lines if line is not None)
+
+    return listing_text, session["outfit_suggestion"], session["fit_card"]
 
 
 # ── interface ─────────────────────────────────────────────────────────────────
 
 EXAMPLE_QUERIES = [
     "vintage graphic tee under $30",
+    "vintage graphic tee under $30. I mostly wear baggy jeans and chunky sneakers.",
+    "90s track jacket size XS under $50",
     "90s track jacket in size M",
     "flowy midi skirt under $40",
-    "black combat boots size 8",
+    "white platform sneakers size 8",
     "designer ballgown size XXS under $5",   # deliberate no-results test
 ]
 
